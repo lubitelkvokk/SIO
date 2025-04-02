@@ -29,24 +29,16 @@ char* get_whole_string_from_list(void);
 
 struct d_list* d_list_head;
 static int general_str_len;
-char* whole_string;
 
 static int my_open(struct inode *i, struct file *f)
 {
   printk(KERN_INFO "Driver: open()\n");
-	whole_string = get_whole_string_from_list();
-	if (!whole_string) {
-		printk(KERN_ERR "Error: whole_string is NULL\n");
-		return -ENOMEM;
-	}
-  printk(KERN_INFO "Driver open: getting whole string %s\n", whole_string);
   return 0;
 }
 
 static int my_close(struct inode *i, struct file *f)
 {
   printk(KERN_INFO "Driver: close()\n");
-	kfree(whole_string);
   return 0;
 }
 
@@ -63,7 +55,8 @@ static int find_number_capacity(int number){
 
 static char* get_digit_str_from_number(int number, int number_capacity){
 	char* string;
-	string = kmalloc(sizeof(char) * number_capacity, GFP_KERNEL);
+	string = kmalloc(sizeof(char) * (number_capacity + 1), GFP_KERNEL);
+	string[number_capacity] = ' ';
 	while (number_capacity > 0){
 		string[--number_capacity] = (number % 10) + '0';
 		number /= 10;
@@ -84,7 +77,7 @@ char* get_whole_string_from_list(){
   int ind = 0;
 
   printk(KERN_INFO "<<get_whole_string_from_list>>: general len of string is: %d", general_str_len);
-	char* final_string = kmalloc(sizeof(char) * (general_str_len + 1), GFP_KERNEL);
+	char* final_string = kmalloc(sizeof(char) * (general_str_len + 2), GFP_KERNEL);
 
   int digit_capacity;
 	list_for_each(pos, &d_list_head->mylist) {
@@ -94,17 +87,33 @@ char* get_whole_string_from_list(){
 		printk(KERN_INFO "<<get_whole_string_from_list>>: intermediate result of ind value: %d", ind);
 	} 
   printk(KERN_INFO "<<get_whole_string_from_list>>: len of string is: %d", ind);
-	final_string[ind] = '\0';
+	final_string[ind] = '\n';
+	final_string[ind + 1] = '\0';
 	return final_string;
 }
 
 static ssize_t my_read(struct file *f, char __user *buf, size_t len, loff_t *off)
 {
-//  copy_to_user(buf+ind, '\n', 1), 
-//  printk(KERN_INFO "Driver: read()\n");
-//  *off += ind;
-//  return ind;
-	return 0;
+	char* whole_string;
+	whole_string = get_whole_string_from_list();
+	if (!whole_string) {
+		printk(KERN_ERR "Error: whole_string is NULL\n");
+		return -ENOMEM;
+	}
+  printk(KERN_INFO "My read %s\n", whole_string);
+  printk(KERN_INFO "My read, general_str_len: %d\n", general_str_len);
+	
+	if (*off >= general_str_len) return 0;
+
+	if (*off + len > general_str_len){
+		len = general_str_len - *off;
+	}
+
+	copy_to_user(buf, whole_string, len + 2);
+	*off += len;
+
+	kfree(whole_string);
+	return len + 2;
 }
 
 struct d_list* create_and_append_node(){
@@ -144,7 +153,8 @@ void add_digit_count_to_list(int d_count){
 	printk(KERN_INFO "<<add_digit_count_to_list>> ENTERING TO CYCLE\n", number_capacity);
 
 	int i;
-	for (i = 0; i < number_capacity; i++){
+// INCLUDING SPACE SIGN
+	for (i = 0; i <= number_capacity; i++){
 		if (index_within_substring % EL_BUF_SIZE == 0 && index_within_substring != 0){
 			curr = create_and_append_node();
 			if (curr == NULL) {
@@ -157,7 +167,7 @@ void add_digit_count_to_list(int d_count){
 // HERE WE CAN REPLACE INDEX_WITHIN_SUBSTRING TO CURR_STR_SIZE
 		curr->curr_str_size++;
 	}
-	general_str_len += number_capacity;
+	general_str_len += number_capacity + 1;
 	printk(KERN_INFO "<<add_digit_count_to_list>> curr->curr_str_size=%d\n", curr->curr_str_size);
 	kfree(string);
 }
