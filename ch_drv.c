@@ -235,9 +235,10 @@ static int __init ch_drv_init(void)
       return -ENOMEM;
     }
 		general_str_len = 0;
-		d_list_head->str = kmalloc(sizeof(char) * EL_BUF_SIZE, GFP_KERNEL);
-		d_list_head->curr_str_size = 0;
+//		d_list_head->str = kmalloc(sizeof(char) * EL_BUF_SIZE, GFP_KERNEL);
+//		d_list_head->curr_str_size = 0;
     INIT_LIST_HEAD(&d_list_head->mylist);
+		create_and_append_node();
     printk(KERN_INFO "List was initialized\n");
     return 0;
 }
