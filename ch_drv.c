@@ -19,7 +19,7 @@ static int last_digit_count;
 
 struct d_list {
   struct list_head mylist;
-  char* str;
+  char* str; // str[100]
 	int curr_str_size;
 };
 
@@ -35,9 +35,11 @@ static int my_open(struct inode *i, struct file *f)
 {
   printk(KERN_INFO "Driver: open()\n");
 	whole_string = get_whole_string_from_list();
-	
-  printk(KERN_INFO "Driver open: getting whole string %d\n", whole_string[0]);
-  printk(KERN_INFO "Driver open: getting whole string test: %s\n", "aboba");
+	if (!whole_string) {
+		printk(KERN_ERR "Error: whole_string is NULL\n");
+		return -ENOMEM;
+	}
+  printk(KERN_INFO "Driver open: getting whole string %s\n", whole_string);
   return 0;
 }
 
@@ -49,6 +51,7 @@ static int my_close(struct inode *i, struct file *f)
 }
 
 static int find_number_capacity(int number){
+	if (number == 0) return 1;
 	int capacity;
 	capacity = 0;
 	while (number > 0){
@@ -62,7 +65,7 @@ static char* get_digit_str_from_number(int number, int number_capacity){
 	char* string;
 	string = kmalloc(sizeof(char) * number_capacity, GFP_KERNEL);
 	while (number_capacity > 0){
-		string[--number_capacity] = number % 10;
+		string[--number_capacity] = (number % 10) + '0';
 		number /= 10;
 	}
 	return string;
@@ -81,7 +84,7 @@ char* get_whole_string_from_list(){
   int ind = 0;
 
   printk(KERN_INFO "<<get_whole_string_from_list>>: general len of string is: %d", general_str_len);
-	char* final_string = kmalloc(sizeof(char) * general_str_len + 1, GFP_KERNEL);
+	char* final_string = kmalloc(sizeof(char) * (general_str_len + 1), GFP_KERNEL);
 
   int digit_capacity;
 	list_for_each(pos, &d_list_head->mylist) {
@@ -156,7 +159,6 @@ void add_digit_count_to_list(int d_count){
 	}
 	general_str_len += number_capacity;
 	printk(KERN_INFO "<<add_digit_count_to_list>> curr->curr_str_size=%d\n", curr->curr_str_size);
-  list_add(&curr->mylist, &d_list_head->mylist); 
 	kfree(string);
 }
 
@@ -250,13 +252,15 @@ static void __exit ch_drv_exit(void)
     
     struct list_head *pos, *q;
     struct d_list *datastructptr;
-    list_for_each_safe(pos, q, &d_list_head->mylist) {
-      datastructptr = list_entry(pos, struct d_list, mylist);
-      printk(KERN_INFO "Deleted element with value: %d\n", datastructptr->curr_str_size);
-      list_del(pos);
-			kfree(datastructptr->str);
-      kfree(datastructptr);
-    }
+		if (!list_empty(&d_list_head->mylist)) {
+			list_for_each_safe(pos, q, &d_list_head->mylist) {
+				datastructptr = list_entry(pos, struct d_list, mylist);
+				printk(KERN_INFO "Deleted element with value: %d\n", datastructptr->curr_str_size);
+				list_del(pos);
+				kfree(datastructptr->str);
+				kfree(datastructptr);
+			}
+		}
     kfree(d_list_head);
 
     cdev_del(&c_dev);
